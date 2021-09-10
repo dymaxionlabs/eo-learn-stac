@@ -1,13 +1,20 @@
 # eolearn-stac
 
-[eo-learn](https://eo-learn.readthedocs.io/en/latest/) tasks for consuming [SpatioTemporal Asset Catalogs](https://stacspec.org/) (STAC).
+[eo-learn](https://eo-learn.readthedocs.io/en/latest/) tasks for consuming
+[SpatioTemporal Asset Catalogs](https://stacspec.org/) (STAC).
 
 *Work in progress*
 
-
 <!-- pyscaffold-notes -->
 
-## Note
+## Contributing
 
-This project has been set up using PyScaffold 4.0.1. For details and usage
-information on PyScaffold see https://pyscaffold.org/.
+Bug reports and pull requests are welcome on GitHub at the [issues
+page](https://github.com/dymaxionlabs/eolearn-stac). This project is intended
+to be a safe, welcoming space for collaboration, and contributors are expected
+to adhere to the [Contributor Covenant](http://contributor-covenant.org) code
+of conduct.
+
+## License
+
+This project is licensed under MIT. Refer to [LICENSE.txt](LICENSE.txt).
