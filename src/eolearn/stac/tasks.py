@@ -9,8 +9,9 @@ import logging
 from itertools import groupby
 
 import rasterio
-from eolearn.core import EOPatch, EOTask
 from sentinelhub import parse_time_interval
+
+from eolearn.core import EOPatch, EOTask
 
 from .stac import STACClient, STACItemsRequest
 
