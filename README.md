@@ -1,11 +1,8 @@
 # eolearn-stac
 
-Add a short description here!
+[eo-learn](https://eo-learn.readthedocs.io/en/latest/) tasks for consuming [SpatioTemporal Asset Catalogs](https://stacspec.org/) (STAC).
 
-
-## Description
-
-A longer description of your project goes here...
+*Work in progress*
 
 
 <!-- pyscaffold-notes -->

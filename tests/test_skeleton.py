@@ -3,7 +3,7 @@ import pytest
 from eolearn_stac.skeleton import fib, main
 
 __author__ = "Damián Silvani"
-__copyright__ = "Damián Silvani"
+__copyright__ = "Dymaxion Labs"
 __license__ = "MIT"
 
 
