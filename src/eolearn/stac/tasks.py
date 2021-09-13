@@ -106,16 +106,18 @@ class STACInputTask(EOTask):
                 )
             }
 
-            if not assets_by_date:
-                LOGGER.warn("No assets found")
-                return
-
             # Filter assets by time interval (just in case)
             if time_interval:
                 min_dt, max_dt = parse_time_interval(time_interval)
                 assets_by_date = {
                     k: v for k, v in assets_by_date.items() if min_dt <= k <= max_dt
                 }
+
+            if not assets_by_date:
+                LOGGER.warn("No assets found")
+                return
+
+            eopatch.timestamp = list(assets_by_date.keys())
 
             if self.single_scene:
                 # TODO: Mosaic images
