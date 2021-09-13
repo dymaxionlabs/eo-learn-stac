@@ -33,7 +33,7 @@ class STACInputTask(EOTask):
         subdataset=None,
         bands=None,
         max_threads=None,
-        single_scene=True,
+        single_scene=False,
         mosaicking_order="mostRecent",
         *,
         collection_name,
