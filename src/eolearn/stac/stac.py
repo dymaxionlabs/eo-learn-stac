@@ -87,6 +87,7 @@ class STACClient:
         local_filename = url.split("/")[-1]
         local_path = os.path.join(output_dir, local_filename)
         if os.path.exists(local_path):
+            LOGGER.info("File %s already exists. Skipping download.", local_path)
             return local_path
         LOGGER.info(f"Download {url} to {local_path} ({local_filename})")
         with requests.get(url, stream=True) as r:

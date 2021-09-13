@@ -5,13 +5,19 @@ __copyright__ = "Dymaxion Labs"
 __license__ = "MIT"
 
 
+import datetime
 import logging
+import os
+import tempfile
 from itertools import groupby
 
+import numpy as np
 import rasterio
+import rasterio.mask
+import rasterio.warp
 from sentinelhub import parse_time_interval
 
-from eolearn.core import EOPatch, EOTask
+from eolearn.core import EOPatch, EOTask, FeatureType
 
 from .stac import STACClient, STACItemsRequest
 
@@ -25,7 +31,6 @@ class STACInputTask(EOTask):
         assets=None,
         subdataset=None,
         bands=None,
-        cache_folder=None,
         max_threads=None,
         single_scene=True,
         mosaicking_order="mostRecent",
@@ -46,8 +51,6 @@ class STACInputTask(EOTask):
         :type bands: iterable of int
         :param size: Number of pixels in x and y dimension.
         :type size: tuple(int, int)
-        :param cache_folder: Path to cache_folder. If set to None (default) requests will not be cached.
-        :type cache_folder: str
         :param max_threads: Maximum threads to be used when downloading data.
         :type max_threads: int
         :param single_scene: If true, the service will compute a single image for the given time interval using mosaicking.
@@ -60,75 +63,90 @@ class STACInputTask(EOTask):
         self.assets = assets
         self.subdataset = subdataset
         self.bands = bands
-        self.cache_folder = cache_folder
         self.max_threads = max_threads
         self.single_scene = single_scene
         self.mosaicking_order = mosaicking_order
 
-    def execute(self, eopatch=None, bbox=None, time_interval=None):
+    def execute(self, eopatch=None, bbox=None, time_interval=None, cache_folder=None):
         """Main execute method for downloading and clipping image"""
 
         eopatch = eopatch or EOPatch()
-
         self._check_and_set_eopatch_bbox(bbox, eopatch)
 
-        reqs = self._build_requests(eopatch.bbox, eopatch.timestamp, time_interval)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_folder = tmpdir if cache_folder is None else cache_folder
 
-        LOGGER.debug(
-            "Downloading %d requests of catalog %s",
-            len(reqs),
-            str(self.catalog_url),
-        )
-        client = STACClient()
-        assets_and_files = list(
-            client.download(
-                reqs, output_dir=self.cache_folder, max_threads=self.max_threads
+            reqs = self._build_requests(eopatch.bbox, eopatch.timestamp, time_interval)
+
+            LOGGER.info(
+                "Downloading %d requests of catalog %s",
+                len(reqs),
+                str(self.catalog_url),
             )
-        )
-        LOGGER.debug("Downloads complete")
-
-        # Group assets by date
-        assets_by_date = {
-            k: list(v)
-            for k, v in groupby(
-                assets_and_files, lambda x: x[0]["properties"]["datetime"]
+            client = STACClient()
+            raw_dir = os.path.join(cache_folder, "raw")
+            assets_and_files = list(
+                client.download(reqs, output_dir=raw_dir, max_threads=self.max_threads)
             )
-        }
+            LOGGER.info("Downloads complete")
 
-        if not assets_by_date:
-            return
+            # Extract subdataset (if needed)
+            extracted_dir = os.path.join(cache_folder, "extracted")
+            assets_and_files = self._extract_subdataset(
+                assets_and_files, output_dir=extracted_dir
+            )
 
-        # Open an image to get pixel size
-        first_date = list(assets_by_date.values())[0]
-        _, first_image_path = first_date[0]
-        LOGGER.info(f"Get resolution from first image: {first_image_path}")
-        size_x, size_y = self._get_pixel_size(first_image_path)
+            # Group assets by date
+            assets_by_date = {
+                datetime.datetime.strptime(k, "%Y-%m-%dT%H:%M:%S.%fZ"): list(v)
+                for k, v in groupby(
+                    assets_and_files,
+                    lambda x: x[0]["properties"]["datetime"],
+                )
+            }
 
-        # # Calculate eopatch shape from number of dates and image size in pixels
-        temporal_dim = len(assets_by_date)
-        shape = temporal_dim, size_y, size_x
-        LOGGER.info(f"Shape: {shape}")
+            if not assets_by_date:
+                LOGGER.warn("No assets found")
+                return
 
-        # TODO: Extract specified subdatasets and bands
-        # if self.single_scene:
-        #     # TODO: Mosaic images
-        #     pass
+            # Filter assets by time interval (just in case)
+            if time_interval:
+                min_dt, max_dt = parse_time_interval(time_interval)
+                assets_by_date = {
+                    k: v for k, v in assets_by_date.items() if min_dt <= k <= max_dt
+                }
 
-        # Clip mosaics to eopatch bbox
-        # self._extract_data(eopatch, assets_by_date, shape)
+            # Open an image to get pixel size
+            first_date = list(assets_by_date.values())[0]
+            _, first_image_path = first_date[0]
+            LOGGER.info(f"Get resolution from first image: {first_image_path}")
+            size_x, size_y = self._get_pixel_size(first_image_path)
 
-        eopatch.meta_info["size_x"] = size_x
-        eopatch.meta_info["size_y"] = size_y
-        # if timestamp:  # do not overwrite time interval in case of timeless features
-        #     eopatch.meta_info["time_interval"] = time_interval
+            # Calculate eopatch shape from number of dates and image size in pixels
+            temporal_dim = len(assets_by_date)
+            shape = temporal_dim, size_y, size_x
+            LOGGER.info(f"Shape: {shape}")
 
-        # self._add_meta_info(eopatch)
+            if self.single_scene:
+                # TODO: Mosaic images
+                raise NotImplementedError(
+                    "Single scene mosaicking is not implemented yet"
+                )
+
+            assets = [asset[0] for asset in assets_by_date.values()]
+            files = [f for _, f in assets]
+
+            # Clip mosaics to eopatch bbox
+            self._extract_data(eopatch, files, shape)
+
+            eopatch.meta_info["size_x"] = size_x
+            eopatch.meta_info["size_y"] = size_y
+
+            self._add_meta_info(eopatch, assets)
 
         return eopatch
 
     def _get_pixel_size(self, path):
-        if self.subdataset:
-            path = self._add_subdataset_to_path(path)
         with rasterio.open(path) as src:
             return src.res
 
@@ -151,9 +169,48 @@ class STACInputTask(EOTask):
             "Either the eopatch or the task must provide bbox, or they must be the same."
         )
 
+    def _extract_subdataset(self, assets_and_files, *, output_dir):
+        """Extract subdataset and bands from assets"""
+        if not self.subdataset:
+            return assets_and_files
+
+        os.makedirs(output_dir, exist_ok=True)
+        res = []
+        for asset, src_path in assets_and_files:
+            name, _ = os.path.splitext(os.path.basename(src_path))
+            dst_path = os.path.join(output_dir, f"{name}.tif")
+            res.append((asset, dst_path))
+
+            if os.path.exists(dst_path):
+                continue
+
+            subdataset_path = self._add_subdataset_to_path(src_path)
+            with rasterio.open(subdataset_path) as src:
+                profile = src.profile.copy()
+                profile.update(driver="GeoTIFF")
+                with rasterio.open(dst_path, "w", **src.profile) as dst:
+                    bands = (
+                        range(1, src.count + 1) if self.bands is None else self.bands
+                    )
+                    for b in bands:
+                        for _, window in src.block_windows(b):
+                            data = src.read(b, window=window)
+                            dst.write(data, b, window=window)
+
+        return res
+
     def _extract_data(self, eopatch, files, shape):
         """Extract data from the received images and assign them to eopatch features"""
-        pass
+        data = []
+        for file in files:
+            with rasterio.open(file) as src:
+                geom = eopatch.bbox.get_geojson()
+                dst_crs = eopatch.bbox.crs.ogc_string()
+
+                geom_src = rasterio.warp.transform_geom(dst_crs, src.crs, geom)
+                out_data, _ = rasterio.mask.mask(src, [geom_src], crop=True)
+                data.append(out_data)
+        eopatch[(FeatureType.DATA, "BANDS")] = np.stack(data, axis=-1)
 
     def _build_requests(self, bbox, timestamp, time_interval):
         """Build requests"""
@@ -180,3 +237,7 @@ class STACInputTask(EOTask):
             bbox=bbox,
             time_interval=time_interval,
         )
+
+    def _add_meta_info(self, eopatch, assets):
+        """Add meta info to eopatch"""
+        eopatch.meta_info["assets"] = assets
