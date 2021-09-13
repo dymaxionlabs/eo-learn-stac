@@ -6,6 +6,7 @@ __license__ = "MIT"
 
 
 import datetime
+import json
 import logging
 import os
 import tempfile
@@ -116,17 +117,6 @@ class STACInputTask(EOTask):
                     k: v for k, v in assets_by_date.items() if min_dt <= k <= max_dt
                 }
 
-            # Open an image to get pixel size
-            first_date = list(assets_by_date.values())[0]
-            _, first_image_path = first_date[0]
-            LOGGER.info(f"Get resolution from first image: {first_image_path}")
-            size_x, size_y = self._get_pixel_size(first_image_path)
-
-            # Calculate eopatch shape from number of dates and image size in pixels
-            temporal_dim = len(assets_by_date)
-            shape = temporal_dim, size_y, size_x
-            LOGGER.info(f"Shape: {shape}")
-
             if self.single_scene:
                 # TODO: Mosaic images
                 raise NotImplementedError(
@@ -137,8 +127,9 @@ class STACInputTask(EOTask):
             files = [f for _, f in assets]
 
             # Clip mosaics to eopatch bbox
-            self._extract_data(eopatch, files, shape)
+            shape = self._extract_data(eopatch, files)
 
+            size_x, size_y = shape[2], shape[1]
             eopatch.meta_info["size_x"] = size_x
             eopatch.meta_info["size_y"] = size_y
 
@@ -199,7 +190,7 @@ class STACInputTask(EOTask):
 
         return res
 
-    def _extract_data(self, eopatch, files, shape):
+    def _extract_data(self, eopatch, files):
         """Extract data from the received images and assign them to eopatch features"""
         data = []
         for file in files:
@@ -209,8 +200,11 @@ class STACInputTask(EOTask):
 
                 geom_src = rasterio.warp.transform_geom(dst_crs, src.crs, geom)
                 out_data, _ = rasterio.mask.mask(src, [geom_src], crop=True)
+                out_data = np.dstack(out_data)
                 data.append(out_data)
-        eopatch[(FeatureType.DATA, "BANDS")] = np.stack(data, axis=-1)
+        bands = np.array(data)
+        eopatch[(FeatureType.DATA, "BANDS")] = bands
+        return bands.shape
 
     def _build_requests(self, bbox, timestamp, time_interval):
         """Build requests"""
@@ -240,4 +234,4 @@ class STACInputTask(EOTask):
 
     def _add_meta_info(self, eopatch, assets):
         """Add meta info to eopatch"""
-        eopatch.meta_info["assets"] = assets
+        eopatch.meta_info["stac_items"] = json.dumps(assets)
