@@ -33,8 +33,6 @@ class STACInputTask(EOTask):
         subdataset=None,
         bands=None,
         max_threads=None,
-        single_scene=False,
-        mosaicking_order="mostRecent",
         *,
         collection_name,
         # size,
@@ -54,10 +52,6 @@ class STACInputTask(EOTask):
         :type size: tuple(int, int)
         :param max_threads: Maximum threads to be used when downloading data.
         :type max_threads: int
-        :param single_scene: If true, the service will compute a single image for the given time interval using mosaicking.
-        :type single_scene: bool
-        :param mosaicking_order: Mosaicking order, which has to be either "mostRecent" or "leastRecent"
-        :type mosaicking_order: str
         """
         self.catalog_url = catalog_url
         self.collection_name = collection_name
@@ -65,8 +59,6 @@ class STACInputTask(EOTask):
         self.subdataset = subdataset
         self.bands = bands
         self.max_threads = max_threads
-        self.single_scene = single_scene
-        self.mosaicking_order = mosaicking_order
 
     def execute(self, eopatch=None, bbox=None, time_interval=None, cache_folder=None):
         """Main execute method for downloading and clipping image"""
@@ -118,12 +110,6 @@ class STACInputTask(EOTask):
                 return
 
             eopatch.timestamp = list(assets_by_date.keys())
-
-            if self.single_scene:
-                # TODO: Mosaic images
-                raise NotImplementedError(
-                    "Single scene mosaicking is not implemented yet"
-                )
 
             assets = [asset[0] for asset in assets_by_date.values()]
             files = [f for _, f in assets]
