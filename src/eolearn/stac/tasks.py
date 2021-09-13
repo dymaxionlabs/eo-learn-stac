@@ -197,17 +197,13 @@ class STACInputTask(EOTask):
     def _build_requests(self, bbox, timestamp, time_interval):
         """Build requests"""
         if timestamp:
-            dates = [
-                (date - self.time_difference, date + self.time_difference)
-                for date in timestamp
-            ]
+            dates = timestamp
         else:
             dates = (
                 [parse_time_interval(time_interval, allow_undefined=True)]
                 if time_interval
                 else [None]
             )
-
         return [self._create_request(date, bbox) for date in dates]
 
     def _create_request(self, time_interval, bbox):
