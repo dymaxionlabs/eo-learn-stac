@@ -58,7 +58,7 @@ class STACClient:
             total=retry_count,
             backoff_factor=backoff_factor,
             status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "OPTIONS"],
+            allowed_methods=["HEAD", "GET", "OPTIONS"],
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.http = requests.Session()
