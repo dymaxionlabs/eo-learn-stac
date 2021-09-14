@@ -37,7 +37,7 @@ except ImportError:
     from sphinx import apidoc
 
 output_dir = os.path.join(__location__, "api")
-module_dir = os.path.join(__location__, "../src/eolearn_stac")
+module_dir = os.path.join(__location__, "../src/eolearn/stac")
 try:
     shutil.rmtree(output_dir)
 except FileNotFoundError:
@@ -114,7 +114,7 @@ source_suffix = [".rst", ".md"]
 master_doc = "index"
 
 # General information about the project.
-project = "eolearn-stac"
+project = "eo-learn-stac"
 copyright = "2021, Dymaxion Labs"
 
 # The version info for the project you're documenting, acts as replacement for
@@ -181,7 +181,7 @@ html_theme_options = {"sidebar_width": "300px", "page_width": "1200px"}
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
 try:
-    from eolearn_stac import __version__ as version
+    from eolearn.stac import __version__ as version
 except ImportError:
     pass
 else:
@@ -246,7 +246,7 @@ html_static_path = ["_static"]
 # html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "eolearn-stac-doc"
+htmlhelp_basename = "eo-learn-stac-doc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -266,7 +266,7 @@ latex_documents = [
     (
         "index",
         "user_guide.tex",
-        "eolearn-stac Documentation",
+        "eo-learn-stac Documentation",
         "Damián Silvani",
         "manual",
     )

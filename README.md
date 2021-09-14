@@ -1,4 +1,4 @@
-# eolearn-stac
+# eo-learn-stac
 
 [eo-learn](https://eo-learn.readthedocs.io/en/latest/) tasks for consuming
 [SpatioTemporal Asset Catalogs](https://stacspec.org/) (STAC).

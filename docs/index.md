@@ -1,4 +1,4 @@
-# eolearn-stac
+# eo-learn-stac
 
 Add a short description here!
 
