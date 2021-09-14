@@ -4,7 +4,6 @@ __author__ = "Damián Silvani"
 __copyright__ = "Dymaxion Labs"
 __license__ = "MIT"
 
-
 import concurrent.futures
 import logging
 import os
@@ -13,6 +12,8 @@ from functools import partial
 from typing import List
 
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from .utils import flatten
 
@@ -52,6 +53,18 @@ class STACItemsRequest:
 
 
 class STACClient:
+    def __init__(self, retry_count=3, backoff_factor=0.1):
+        retry_strategy = Retry(
+            total=retry_count,
+            backoff_factor=backoff_factor,
+            status_forcelist=[429, 500, 502, 503, 504],
+            method_whitelist=["HEAD", "GET", "OPTIONS"],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.http = requests.Session()
+        self.http.mount("https://", adapter)
+        self.http.mount("http://", adapter)
+
     def download(
         self,
         reqs: List[STACItemsRequest],
@@ -73,7 +86,7 @@ class STACClient:
             return zip(list(items), list(files))
 
     def _get_items(self, request: STACItemsRequest) -> List[dict]:
-        res = requests.get(request.url, params=request.parameters).json()
+        res = self.http.get(request.url, params=request.parameters).json()
         return [(feat, request) for feat in res["features"]]
 
     def _get_assets(self, item: dict, filter_assets=None) -> List[dict]:
@@ -90,7 +103,7 @@ class STACClient:
             LOGGER.info("File %s already exists. Skipping download.", local_path)
             return local_path
         LOGGER.info(f"Download {url} to {local_path} ({local_filename})")
-        with requests.get(url, stream=True) as r:
+        with self.http.get(url, stream=True) as r:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             with open(local_path, "wb") as f:
                 shutil.copyfileobj(r.raw, f)
