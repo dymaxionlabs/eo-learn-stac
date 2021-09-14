@@ -14,7 +14,9 @@ from itertools import groupby
 
 import numpy as np
 import rasterio
+import rasterio.errors
 import rasterio.mask
+import rasterio.merge
 import rasterio.warp
 from sentinelhub import parse_time_interval
 
@@ -123,19 +125,14 @@ class STACInputTask(EOTask):
                 LOGGER.warn("No assets found")
                 return
 
-            eopatch.timestamp = list(assets_by_date.keys())
+            # Merge assets by date into a single image
+            merged_dir = os.path.join(cache_folder, "merged")
+            image_by_date = self._merge_images(assets_by_date, output_dir=merged_dir)
 
-            assets = [asset[0] for asset in assets_by_date.values()]
-            files = [f for _, f in assets]
+            # Clip mosaics to eopatch bbox, set timestamp and shape on meta_info
+            self._extract_data(eopatch, image_by_date)
 
-            # Clip mosaics to eopatch bbox
-            shape = self._extract_data(eopatch, files)
-
-            size_x, size_y = shape[2], shape[1]
-            eopatch.meta_info["size_x"] = size_x
-            eopatch.meta_info["size_y"] = size_y
-
-            self._add_meta_info(eopatch, assets)
+            self._add_meta_info(eopatch, list(image_by_date.values()))
 
         return eopatch
 
@@ -192,23 +189,50 @@ class STACInputTask(EOTask):
 
         return res
 
-    def _extract_data(self, eopatch, files):
-        """Extract data from the received images and assign them to eopatch features"""
+    def _merge_images(self, assets_by_date, method="first", *, output_dir):
+        """Merge images from assets_by_date into a single image"""
+        image_by_date = {}
+        for i, (date, assets) in enumerate(assets_by_date.items()):
+            dst_path = os.path.join(output_dir, f'{i}_{date.strftime("%Y%m%d")}.tif')
+            datasets = [rasterio.open(path) for _, path in assets]
+            os.makedirs(output_dir, exist_ok=True)
+            rasterio.merge.merge(datasets, dst_path=dst_path, method=method)
+            LOGGER.info("%s written", dst_path)
+            for ds in datasets:
+                ds.close()
+            image_by_date[date] = (assets, dst_path)
+        return image_by_date
+
+    def _extract_data(self, eopatch, image_by_date):
+        """
+        Extract data from the received images and assign them as BANDS data
+        feature on EOPatch.
+
+        """
         data = []
-        for file in files:
+        timestamp = []
+        for datetime, (_, file) in image_by_date.items():
             with rasterio.open(file) as src:
                 geom = eopatch.bbox.get_geojson()
                 dst_crs = eopatch.bbox.crs.ogc_string()
 
                 geom_src = rasterio.warp.transform_geom(dst_crs, src.crs, geom)
+
                 out_data, _ = rasterio.mask.mask(
                     src, [geom_src], crop=True, all_touched=self.all_touched
                 )
                 out_data = np.dstack(out_data)
                 data.append(out_data)
+                timestamp.append(datetime)
+
         bands = np.array(data)
+
+        eopatch.timestamp = timestamp
         eopatch[(FeatureType.DATA, "BANDS")] = bands
-        return bands.shape
+
+        size_x, size_y = bands.shape[2], bands.shape[1]
+        eopatch.meta_info["size_x"] = size_x
+        eopatch.meta_info["size_y"] = size_y
 
     def _build_requests(self, bbox, timestamp, time_interval):
         """Build requests"""
