@@ -32,6 +32,7 @@ class STACInputTask(EOTask):
         assets=None,
         subdataset=None,
         bands=None,
+        all_touched=True,
         max_threads=None,
         *,
         collection_name,
@@ -50,6 +51,8 @@ class STACInputTask(EOTask):
         :type bands: iterable of int
         :param size: Number of pixels in x and y dimension.
         :type size: tuple(int, int)
+        :param all_touched: If True, all pixels touched by the geometry are extracted.
+        :type all_touched: bool
         :param max_threads: Maximum threads to be used when downloading data.
         :type max_threads: int
         """
@@ -58,6 +61,7 @@ class STACInputTask(EOTask):
         self.assets = assets
         self.subdataset = subdataset
         self.bands = bands
+        self.all_touched = all_touched
         self.max_threads = max_threads
 
     def execute(self, eopatch=None, bbox=None, time_interval=None, cache_folder=None):
@@ -187,7 +191,9 @@ class STACInputTask(EOTask):
                 dst_crs = eopatch.bbox.crs.ogc_string()
 
                 geom_src = rasterio.warp.transform_geom(dst_crs, src.crs, geom)
-                out_data, _ = rasterio.mask.mask(src, [geom_src], crop=True)
+                out_data, _ = rasterio.mask.mask(
+                    src, [geom_src], crop=True, all_touched=self.all_touched
+                )
                 out_data = np.dstack(out_data)
                 data.append(out_data)
         bands = np.array(data)
