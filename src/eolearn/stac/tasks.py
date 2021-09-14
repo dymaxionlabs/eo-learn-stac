@@ -34,6 +34,8 @@ class STACInputTask(EOTask):
         bands=None,
         all_touched=True,
         max_threads=None,
+        retry_count=3,
+        backoff_factor=0.1,
         *,
         collection_name,
         # size,
@@ -55,6 +57,10 @@ class STACInputTask(EOTask):
         :type all_touched: bool
         :param max_threads: Maximum threads to be used when downloading data.
         :type max_threads: int
+        :param retry_count: Number of retries when downloading data.
+        :type retry_count: int
+        :param backoff_factor: Backoff factor for retries.
+        :type backoff_factor: float
         """
         self.catalog_url = catalog_url
         self.collection_name = collection_name
@@ -63,6 +69,8 @@ class STACInputTask(EOTask):
         self.bands = bands
         self.all_touched = all_touched
         self.max_threads = max_threads
+        self.retry_count = retry_count
+        self.backoff_factor = backoff_factor
 
     def execute(self, eopatch=None, bbox=None, time_interval=None, cache_folder=None):
         """Main execute method for downloading and clipping image"""
@@ -80,7 +88,9 @@ class STACInputTask(EOTask):
                 len(reqs),
                 str(self.catalog_url),
             )
-            client = STACClient()
+            client = STACClient(
+                retry_count=self.retry_count, backoff_factor=self.backoff_factor
+            )
             raw_dir = os.path.join(cache_folder, "raw")
             assets_and_files = list(
                 client.download(reqs, output_dir=raw_dir, max_threads=self.max_threads)
