@@ -3,6 +3,10 @@
 [eo-learn](https://eo-learn.readthedocs.io/en/latest/) tasks for consuming
 [SpatioTemporal Asset Catalogs](https://stacspec.org/) (STAC).
 
+It provides a `STACInputTask` task class that, similarly to `SentinelHubInputTask`,
+queries a STAC catalog, fetches images from a time interval and bounding box, 
+and finally creates time-dependant EOPatches.
+
 *Work in progress*
 
 <!-- pyscaffold-notes -->
