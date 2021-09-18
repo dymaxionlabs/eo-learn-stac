@@ -80,7 +80,7 @@ class STACInputTask(EOTask):
         eopatch = eopatch or EOPatch()
         self._check_and_set_eopatch_bbox(bbox, eopatch)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="eo-learn-stac_") as tmpdir:
             cache_folder = tmpdir if cache_folder is None else cache_folder
 
             reqs = self._build_requests(eopatch.bbox, eopatch.timestamp, time_interval)
