@@ -48,7 +48,9 @@ class STACSearchRequest:
         return dict(
             collections=[self.collection_name],
             bbox=[v for v in self.bbox],
-            datetime="/".join([date.isoformat() for date in self.time_interval]),
+            datetime="/".join(
+                [f"{date.isoformat()}.000Z" for date in self.time_interval]
+            ),
         )
 
     @property
@@ -94,11 +96,17 @@ class STACClient:
             return zip(list(items), list(files))
 
     def _get_items(self, request: STACSearchRequest) -> List[dict]:
+        data = json.dumps(request.payload)
+        LOGGER.debug(
+            "POST %s with data=%s headers=%s", request.url, data, request.headers
+        )
         res = self.http.post(
             request.url,
-            data=json.dumps(request.payload),
+            data=data,
             headers=request.headers,
         )
+        if res.status_code != 200:
+            LOGGER.error("Response: %s", res.text)
         res.raise_for_status()
         json_body = res.json()
         return [(feat, request) for feat in json_body["features"]]
