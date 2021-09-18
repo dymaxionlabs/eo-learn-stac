@@ -5,6 +5,7 @@ __copyright__ = "Dymaxion Labs"
 __license__ = "MIT"
 
 import concurrent.futures
+import json
 import logging
 import os
 import shutil
@@ -20,7 +21,7 @@ from .utils import flatten
 LOGGER = logging.getLogger(__name__)
 
 
-class STACItemsRequest:
+class STACSearchRequest:
     def __init__(
         self,
         bbox=None,
@@ -40,16 +41,23 @@ class STACItemsRequest:
 
     @property
     def url(self):
-        return f"{self.catalog_url}/collections/{self.collection_name}/items"
+        return f"{self.catalog_url.rstrip('/')}/search"
 
     @property
-    def parameters(self):
+    def payload(self):
         return dict(
-            bbox=",".join(str(v) for v in self.bbox),
-            datetime=",".join(
-                [f"{date.isoformat()}.000Z" for date in self.time_interval]
-            ),
+            collections=[self.collection_name],
+            bbox=[v for v in self.bbox],
+            datetime="/".join([date.isoformat() for date in self.time_interval]),
         )
+
+    @property
+    def headers(self):
+        return {
+            "Accept-Encoding": "gzip, deflate",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+        }
 
 
 class STACClient:
@@ -67,7 +75,7 @@ class STACClient:
 
     def download(
         self,
-        reqs: List[STACItemsRequest],
+        reqs: List[STACSearchRequest],
         output_dir: str,
         max_threads: int = 5,
         timeout: int = 360,
@@ -85,15 +93,22 @@ class STACClient:
             items = [item for item, _ in items_reqs]
             return zip(list(items), list(files))
 
-    def _get_items(self, request: STACItemsRequest) -> List[dict]:
-        res = self.http.get(request.url, params=request.parameters).json()
-        return [(feat, request) for feat in res["features"]]
+    def _get_items(self, request: STACSearchRequest) -> List[dict]:
+        res = self.http.post(
+            request.url,
+            data=json.dumps(request.payload),
+            headers=request.headers,
+        )
+        res.raise_for_status()
+        json_body = res.json()
+        return [(feat, request) for feat in json_body["features"]]
 
     def _get_assets(self, item: dict, filter_assets=None) -> List[dict]:
-        assets = item["assets"]
-        if filter_assets:
-            assets = [v for k, v in assets.items() if k in filter_assets]
-        return assets
+        return [
+            v
+            for k, v in item["assets"].items()
+            if not filter_assets or k in filter_assets
+        ]
 
     def _download_asset(self, asset: dict, *, output_dir: str) -> str:
         url = asset["href"]

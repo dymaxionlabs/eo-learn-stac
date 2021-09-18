@@ -22,7 +22,7 @@ from sentinelhub import parse_time_interval
 
 from eolearn.core import EOPatch, EOTask, FeatureType
 
-from .stac import STACClient, STACItemsRequest
+from .stac import STACClient, STACSearchRequest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -248,7 +248,7 @@ class STACInputTask(EOTask):
 
     def _create_request(self, time_interval, bbox):
         """Create an instance of Request"""
-        return STACItemsRequest(
+        return STACSearchRequest(
             catalog_url=self.catalog_url,
             collection_name=self.collection_name,
             assets=self.assets,
