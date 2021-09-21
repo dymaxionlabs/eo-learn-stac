@@ -127,7 +127,7 @@ class STACInputTask(EOTask):
 
             if not assets_by_date:
                 LOGGER.warn("No assets found")
-                return
+                return eopatch
 
             # Merge assets by date into a single image
             merged_dir = os.path.join(cache_folder, "merged")
