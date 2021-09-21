@@ -83,7 +83,7 @@ class STACClient:
         reqs: List[STACSearchRequest],
         output_dir: str,
         max_threads: int = 5,
-        timeout: int = 360,
+        timeout: int = 600,
     ) -> List[str]:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
             items_reqs = flatten(executor.map(self._get_items, reqs, timeout=timeout))
