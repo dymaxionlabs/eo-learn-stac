@@ -38,6 +38,7 @@ class STACInputTask(EOTask):
         max_threads=None,
         retry_count=3,
         backoff_factor=0.1,
+        limit=10,
         *,
         collection_name,
         # size,
@@ -63,6 +64,8 @@ class STACInputTask(EOTask):
         :type retry_count: int
         :param backoff_factor: Backoff factor for retries.
         :type backoff_factor: float
+        :param limit: Maximum number of assets to be downloaded.
+        :type limit: int
         """
         self.catalog_url = catalog_url
         self.collection_name = collection_name
@@ -73,6 +76,7 @@ class STACInputTask(EOTask):
         self.max_threads = max_threads
         self.retry_count = retry_count
         self.backoff_factor = backoff_factor
+        self.limit = limit
 
     def execute(self, eopatch=None, bbox=None, time_interval=None, cache_folder=None):
         """Main execute method for downloading and clipping image"""
@@ -254,6 +258,7 @@ class STACInputTask(EOTask):
             assets=self.assets,
             bbox=bbox,
             time_interval=time_interval,
+            limit=self.limit,
         )
 
     def _add_meta_info(self, eopatch, assets):

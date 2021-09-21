@@ -28,6 +28,7 @@ class STACSearchRequest:
         time_interval=None,
         data_folder=None,
         assets=None,
+        limit=10,
         *,
         catalog_url,
         collection_name,
@@ -38,6 +39,7 @@ class STACSearchRequest:
         self.bbox = bbox
         self.time_interval = time_interval
         self.data_folder = data_folder
+        self.limit = limit
 
     @property
     def url(self):
@@ -51,6 +53,7 @@ class STACSearchRequest:
             datetime="/".join(
                 [f"{date.isoformat()}.000Z" for date in self.time_interval]
             ),
+            limit=self.limit,
         )
 
     @property
